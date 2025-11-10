@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Streaming Implementation Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        h1 {
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            margin-top: 30px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+        .code-block {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        .parameter-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .parameter-table th, .parameter-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .parameter-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .parameter-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .highlight {
+            background-color: #ffffcc;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .note {
+            background-color: #e8f4ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        ul li {
+            margin-bottom: 8px;
+        }
+        .timer-section {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .state-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 0 4px;
+        }
+        .state-connected { background-color: #28a745; color: white; }
+        .state-connecting { background-color: #ffc107; color: #333; }
+        .state-failed { background-color: #dc3545; color: white; }
+        .state-not-connected { background-color: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TTS Streaming Implementation Documentation</h1>
+        
+        <p>This document provides a comprehensive overview of the Text-to-Speech (TTS) streaming implementation in the jambonz feature server, including logic boundaries, timer mechanisms, buffer management, and flow diagrams.</p>
+
+        <h2>1. Architecture Overview</h2>
+        
+        <div class="mermaid">
+graph TB
+    subgraph "Application Layer"
+        A[Say Task] --> B[CallSession]
+    end
+    
+    subgraph "Buffer Management"
+        B --> C[TtsStreamingBuffer]
+        C --> D[Queue Management]
+        C --> E[Timer Control]
+        C --> F[Connection State]
+    end
+    
+    subgraph "Vendor Integration"
+        C --> G[Vendor API]
+        G --> H[Deepgram]
+        G --> I[Cartesia]
+        G --> J[ElevenLabs]
+        G --> K[RimeLabs]
+        G --> L[Custom]
+    end
+    
+    style A fill:#e1f5fe
+    style C fill:#fff9c4
+    style G fill:#f3e5f5
+        </div>
+
+        <h2>2. Core Components</h2>
+
+        <h3>2.1 TtsStreamingBuffer Class</h3>
+        <p>The central component managing TTS streaming functionality:</p>
+        
+        <div class="code-block">
+class TtsStreamingBuffer extends Emitter {
+    // Key properties:
+    - queue: Array of text/flush items
+    - bufferedLength: Total characters buffered
+    - timer: Timeout for sentence boundary detection
+    - _connectionStatus: Current connection state
+    - _isFull: Buffer full indicator
+    - lastUpdateTime: Last buffer update timestamp
+}
+        </div>
+
+        <h3>2.2 Configuration Constants</h3>
+        <table class="parameter-table">
+            <tr>
+                <th>Constant</th>
+                <th>Value</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td>MAX_CHUNK_SIZE</td>
+                <td>1800</td>
+                <td>Maximum characters per TTS chunk</td>
+            </tr>
+            <tr>
+                <td>HIGH_WATER_BUFFER_SIZE</td>
+                <td>1000</td>
+                <td>Buffer full threshold</td>
+            </tr>
+            <tr>
+                <td>LOW_WATER_BUFFER_SIZE</td>
+                <td>200</td>
+                <td>Buffer resume threshold</td>
+            </tr>
+            <tr>
+                <td>TIMEOUT_RETRY_MSECS</td>
+                <td>1000</td>
+                <td>Timer delay for sentence boundary detection</td>
+            </tr>
+        </table>
+
+        <h2>3. Connection State Management</h2>
+
+        <div class="mermaid">
+stateDiagram-v2
+    [*] --> NotConnected
+    NotConnected --> Connecting: start()
+    Connecting --> Connected: Connect Event
+    Connecting --> Failed: Connect Failure
+    Connected --> NotConnected: stop()
+    Failed --> NotConnected: stop()
+    
+    NotConnected: Initial state
+    Connecting: Establishing vendor connection
+    Connected: Ready for streaming
+    Failed: Connection failed
+        </div>
+
+        <p>Connection states:</p>
+        <ul>
+            <li><span class="state-badge state-not-connected">NotConnected</span> - Initial state or after stop</li>
+            <li><span class="state-badge state-connecting">Connecting</span> - Establishing vendor connection</li>
+            <li><span class="state-badge state-connected">Connected</span> - Ready for streaming</li>
+            <li><span class="state-badge state-failed">Failed</span> - Connection failure</li>
+        </ul>
+
+        <h2>4. Buffer Management and Flow Control</h2>
+
+        <div class="mermaid">
+flowchart TD
+    A[bufferTokens called] --> B{Connection Status?}
+    B -->|Failed| C[Return failed]
+    B -->|Other| D{Is whitespace only?}
+    D -->|Yes & Empty Buffer| E[Discard & Return OK]
+    D -->|No| F{Buffer Full?}
+    F -->|Yes > 1000 chars| G[Emit Pause Event]
+    G --> H[Return failed/full]
+    F -->|No| I[Add to Queue]
+    I --> J[Update lastUpdateTime]
+    J --> K[Call _feedQueue]
+    K --> L{Buffer < 200?}
+    L -->|Yes & Was Full| M[Emit Resume Event]
+    L -->|No| N[Continue Processing]
+    M --> N
+        </div>
+
+        <div class="note">
+            <strong>Flow Control:</strong> The buffer implements backpressure using high/low water marks. When the buffer exceeds 1000 characters, it pauses input. When it drops below 200 characters, it resumes.
+        </div>
+
+        <h2>5. Queue Processing Logic</h2>
+
+        <h3>5.1 Two-Phase Processing</h3>
+        <p>The <code>_feedQueue</code> method processes the queue in two phases:</p>
+
+        <div class="mermaid">
+flowchart TD
+    A[_feedQueue Start] --> B[Phase 1: Process Flush Markers]
+    B --> C{Find flush marker?}
+    C -->|Yes| D[Accumulate text before flush]
+    D --> E[Send accumulated text]
+    E --> F[Execute flush command]
+    F --> C
+    C -->|No| G[Phase 2: Process Text]
+    G --> H{Queue empty?}
+    H -->|Yes| I[Clear timer & Return]
+    H -->|No| J[Accumulate text up to MAX_CHUNK_SIZE]
+    J --> K{Find sentence boundary?}
+    K -->|Yes| L[Extract chunk]
+    K -->|No| M{Timeout active?}
+    M -->|Yes| N[Find word boundary]
+    M -->|No| O[Set timer & Return]
+    N --> P{Word boundary found?}
+    P -->|Yes| L
+    P -->|No| O
+    L --> Q[Send chunk to TTS]
+    Q --> R[Update queue & bufferedLength]
+    R --> S[Recursive call _feedQueue]
+        </div>
+
+        <h3>5.2 Sentence Boundary Detection</h3>
+        <div class="code-block">
+const findSentenceBoundary = (text, limit) => {
+    // Look for punctuation or double newline
+    const sentenceEndRegex = /[.!?](?=\s|$)|\n\n/g;
+    // Find last valid sentence boundary before limit
+    // Validates non-empty preceding text
+    // Handles decimal numbers (e.g., 3.14)
+};
+        </div>
+
+        <h2>6. Timer Management</h2>
+
+        <div class="timer-section">
+            <h3>Timer Logic Flow</h3>
+            <div class="mermaid">
+flowchart LR
+    A[Text Added] --> B[No Sentence Boundary]
+    B --> C[Set Timer 1000ms]
+    C --> D{Timer Fires}
+    D --> E{Recent Text Added?}
+    E -->|Yes < 1000ms| F[Postpone & Reset Timer]
+    E -->|No| G[Force Processing]
+    G --> H[Use Word Boundaries]
+        </div>
+            
+            <p><strong>Key Timer Behaviors:</strong></p>
+            <ul>
+                <li>Timer activates when text lacks sentence boundaries</li>
+                <li>1 second delay before forcing output</li>
+                <li>Checks <code>lastUpdateTime</code> to avoid cutting off incoming streams</li>
+                <li>Falls back to word boundaries when timer expires</li>
+                <li>Automatically cleared when buffer empties</li>
+            </ul>
+        </div>
+
+        <h2>7. Text Processing Pipeline</h2>
+
+        <div class="mermaid">
+flowchart TB
+    A[Raw Text Input] --> B[Whitespace Check]
+    B --> C[Add to Queue]
+    C --> D[Combine Queue Items]
+    D --> E[Find Chunk Boundary]
+    E --> F[Extract Chunk]
+    F --> G[Replace Double Newlines]
+    G --> H[Whitespace Validation]
+    H -->|Not Empty| I[Send to TTS Vendor]
+    H -->|Empty| J[Restore to Queue]
+    
+    style A fill:#ffebee
+    style I fill:#e8f5e9
+        </div>
+
+        <h2>8. Event System</h2>
+
+        <table class="parameter-table">
+            <tr>
+                <th>Event Type</th>
+                <th>Trigger Condition</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td>TtsStreamingEvents.Empty</td>
+                <td>Vendor reports empty buffer</td>
+                <td>Signal TTS playback complete</td>
+            </tr>
+            <tr>
+                <td>TtsStreamingEvents.Pause</td>
+                <td>Buffer exceeds HIGH_WATER_BUFFER_SIZE</td>
+                <td>Request upstream to pause sending</td>
+            </tr>
+            <tr>
+                <td>TtsStreamingEvents.Resume</td>
+                <td>Buffer drops below LOW_WATER_BUFFER_SIZE</td>
+                <td>Request upstream to resume sending</td>
+            </tr>
+            <tr>
+                <td>TtsStreamingEvents.ConnectFailure</td>
+                <td>Vendor connection fails</td>
+                <td>Notify connection error</td>
+            </tr>
+        </table>
+
+        <h2>9. Flush Operation</h2>
+
+        <div class="mermaid">
+flowchart TD
+    A[flush() called] --> B{Connection Status}
+    B -->|Connecting| C[Add flush marker to queue]
+    B -->|Connected & Empty Queue| D[Execute flush immediately]
+    B -->|Connected & Has Queue| E[Add flush marker to queue]
+    B -->|Not Connected| F[Log & Return]
+    
+    C --> G[Wait for connection]
+    E --> H[Process in _feedQueue]
+    D --> I[Send flush command]
+        </div>
+
+        <h3>9.1 Flush Command Interaction with Chunk Sending</h3>
+        <div class="mermaid">
+sequenceDiagram
+    participant App as Application
+    participant TSB as TtsStreamingBuffer
+    participant Q as Queue
+    participant V as Vendor API
+    
+    Note over Q: Queue: ["Hello world", "How are", flush, "you today?"]
+    
+    App->>TSB: flush()
+    TSB->>Q: Add flush marker
+    TSB->>TSB: _feedQueue() Phase 1
+    
+    rect rgb(255, 240, 240)
+        Note over TSB: Phase 1: Process flush markers
+        TSB->>Q: Find flush at position 3
+        TSB->>Q: Accumulate: "Hello world" + "How are"
+        TSB->>V: send("Hello world How are")
+        Note right of V: Immediate send<br/>ignoring sentence boundaries
+        TSB->>Q: Remove processed items + flush
+        TSB->>V: flush command
+        Note right of V: Force vendor to<br/>process all buffered audio
+    end
+    
+    rect rgb(240, 255, 240)
+        Note over TSB: Phase 2: Resume normal processing
+        TSB->>Q: Process "you today?"
+        TSB->>TSB: Check sentence boundary
+        TSB->>V: send("you today?")
+        Note right of V: Normal chunk with<br/>sentence detection
+    end
+        </div>
+
+        <h3>9.2 Detailed Flush Processing in _feedQueue</h3>
+        <div class="mermaid">
+flowchart LR
+    subgraph "Queue State"
+        Q1[Text: "Hello"] --> Q2[Text: "world."]
+        Q2 --> Q3[Flush Marker]
+        Q3 --> Q4[Text: "Next"]
+        Q4 --> Q5[Text: "sentence."]
+    end
+    
+    subgraph "Flush Processing"
+        A[Detect flush at pos 3] --> B[Accumulate all before flush]
+        B --> C["Combined: 'Hello world.'"]
+        C --> D[Send to vendor immediately]
+        D --> E[Send flush command]
+        E --> F[Continue with remaining queue]
+    end
+    
+    Q3 -.->|Triggers| A
+    style Q3 fill:#ff9999
+    style D fill:#99ff99
+    style E fill:#99ff99
+        </div>
+
+        <h3>9.3 Vendor API Calls During Flush</h3>
+        <div class="code-block">
+// Example flush sequence with actual API calls:
+
+// 1. Text accumulated before flush (bypasses sentence detection)
+await this._api(ep, [uuid, 'send', 'Hello world How are']);
+// Vendor command: uuid_deepgram_tts_streaming ^^|&lt;uuid&gt;|send|Hello world How are
+
+// 2. Flush command sent immediately after
+await this._doFlush();
+// Vendor command: uuid_deepgram_tts_streaming ^^|&lt;uuid&gt;|flush
+
+// 3. Vendor processes all buffered audio immediately
+// 4. Continue with normal text processing after flush
+        </div>
+
+        <div class="warning">
+            <strong>Important:</strong> Flush markers force immediate sending of all preceding text, bypassing sentence boundary detection. Multiple consecutive flush markers are consolidated.
+        </div>
+
+        <h3>9.4 Edge Cases: Multiple Flush Markers</h3>
+        <div class="mermaid">
+flowchart TD
+    subgraph "Queue with Multiple Flushes"
+        Q1["Text: 'First'"] --> F1[Flush]
+        F1 --> F2[Flush]
+        F2 --> Q2["Text: 'Second'"]
+        Q2 --> F3[Flush]
+        F3 --> Q3["Text: 'Third'"]
+    end
+    
+    subgraph "Processing"
+        A[Process Phase 1] --> B[Find first flush after text]
+        B --> C[Send 'First']
+        C --> D[Send single flush command]
+        D --> E[Skip consecutive flush]
+        E --> F[Find next flush after text]
+        F --> G[Send 'Second']
+        G --> H[Send flush command]
+        H --> I[Process 'Third' normally]
+    end
+    
+    subgraph "Vendor Calls"
+        V1["send('First')"]
+        V2["flush()"]
+        V3["send('Second')"]
+        V4["flush()"]
+        V5["send('Third')"]
+    end
+    
+    C --> V1
+    D --> V2
+    G --> V3
+    H --> V4
+    I --> V5
+    
+    style F1 fill:#ff9999
+    style F2 fill:#ff9999
+    style F3 fill:#ff9999
+        </div>
+
+        <h3>9.5 Flush with Empty Buffer</h3>
+        <div class="mermaid">
+sequenceDiagram
+    participant App
+    participant TSB as TtsStreamingBuffer
+    participant V as Vendor
+    
+    Note over TSB: Empty queue, no buffered text
+    
+    App->>TSB: flush()
+    TSB->>TSB: Check queue isEmpty
+    alt Queue is empty
+        TSB->>V: flush() immediately
+        Note right of V: Flush even with no pending text
+    else Queue has items
+        TSB->>TSB: Add flush marker to queue
+        Note over TSB: Process in _feedQueue later
+    end
+        </div>
+
+        <h2>10. Clear Operation</h2>
+
+        <p>The clear operation provides immediate buffer cleanup:</p>
+        <ul>
+            <li>Cancels active timers</li>
+            <li>Sends clear command to vendor</li>
+            <li>Empties queue and resets bufferedLength</li>
+            <li>Clears flow control state</li>
+            <li>Only operates when connected</li>
+        </ul>
+
+        <h2>11. Vendor API Integration</h2>
+
+        <div class="code-block">
+async _api(ep, args) {
+    const apiCmd = `uuid_${vendor}_tts_streaming`;
+    const res = await ep.api(apiCmd, `^^|${args.join('|')}`);
+    // Validates +OK response
+    // Throws on error
+}
+
+// Supported commands:
+- connect: Establish vendor connection
+- send: Send text chunk
+- flush: Force output
+- clear: Clear buffer
+- stop: Close connection
+        </div>
+
+        <h2>12. Error Handling</h2>
+
+        <div class="mermaid">
+flowchart TD
+    A[Error Occurs] --> B{Error Type}
+    B -->|Connection Failed| C[Set Failed Status]
+    B -->|Send Failed| D[Clear Queue]
+    B -->|API Error| E[Log Error]
+    
+    C --> F[Emit ConnectFailure]
+    D --> G[Reset bufferedLength]
+    E --> H[Continue if possible]
+    
+    F --> I[Reject new requests]
+    G --> J[Attempt recovery]
+        </div>
+
+        <h2>13. Integration with CallSession</h2>
+
+        <div class="code-block">
+// Lifecycle in CallSession
+constructor() {
+    this.ttsStreamingBuffer = new TtsStreamingBuffer(this);
+    // Register event handlers
+}
+
+startTtsStream() {
+    this.ttsStreamingBuffer?.start();
+}
+
+stopTtsStream() {
+    // Send notification
+    this.ttsStreamingBuffer?.stop();
+}
+
+// Token buffering
+_internalTtsStreamingBufferTokens(tokens) {
+    return this.ttsStreamingBuffer?.bufferTokens(tokens);
+}
+        </div>
+
+        <h2>14. Performance Considerations</h2>
+
+        <ul>
+            <li><strong>Chunking Strategy:</strong> 1800 character chunks balance latency and efficiency</li>
+            <li><strong>Buffer Limits:</strong> Prevents memory issues with 1000 character limit</li>
+            <li><strong>Timer Optimization:</strong> 1 second delay balances responsiveness and completeness</li>
+            <li><strong>Queue Structure:</strong> Array-based queue with O(1) push and O(n) shift operations</li>
+            <li><strong>Whitespace Handling:</strong> Prevents empty audio generation</li>
+        </ul>
+
+        <h2>15. Best Practices</h2>
+
+        <div class="note">
+            <h4>Implementation Guidelines:</h4>
+            <ol>
+                <li>Always check connection status before operations</li>
+                <li>Handle events asynchronously to prevent blocking</li>
+                <li>Use flush sparingly - it bypasses optimizations</li>
+                <li>Monitor buffer levels to prevent overflow</li>
+                <li>Implement proper error recovery strategies</li>
+                <li>Clean up resources on session end</li>
+            </ol>
+        </div>
+
+        <h2>16. Complete Flow Example</h2>
+
+        <div class="mermaid">
+sequenceDiagram
+    participant App as Application
+    participant CS as CallSession
+    participant TSB as TtsStreamingBuffer
+    participant V as Vendor API
+    
+    App->>CS: Execute Say task
+    CS->>TSB: startTtsStream()
+    TSB->>V: connect
+    V-->>TSB: Connected
+    
+    loop Text Processing
+        App->>CS: Send text tokens
+        CS->>TSB: bufferTokens(text)
+        TSB->>TSB: Check buffer capacity
+        alt Buffer not full
+            TSB->>TSB: Add to queue
+            TSB->>TSB: Process queue
+            TSB->>V: send(chunk)
+        else Buffer full
+            TSB-->>CS: Pause event
+            CS-->>App: Backpressure signal
+        end
+    end
+    
+    App->>CS: Complete
+    CS->>TSB: flush()
+    TSB->>V: flush
+    TSB-->>CS: Empty event
+    CS->>TSB: stop()
+    TSB->>V: stop
+        </div>
+
+        <h3>16.1 Complex Chunking and Flush Scenario</h3>
+        <div class="mermaid">
+flowchart TD
+    subgraph "Initial Queue State"
+        I1["Text: 'This is a long story about...' (500 chars)"]
+        I2["Text: 'Once upon a time there was...' (300 chars)"]
+        I3["Flush Marker"]
+        I4["Text: 'The end.' (8 chars)"]
+    end
+    
+    subgraph "Processing Steps"
+        A[Start _feedQueue] --> B{Phase 1: Check flush}
+        B -->|Found at pos 3| C[Accumulate 800 chars before flush]
+        C --> D[Send combined 800 chars to vendor]
+        D --> E[Send flush command]
+        E --> F{Phase 2: Process remaining}
+        F --> G[Process 'The end.']
+        G --> H[Find sentence boundary]
+        H --> I[Send 'The end.' chunk]
+    end
+    
+    subgraph "Vendor API Calls"
+        V1["send('This is a long story about... Once upon a time there was...')"]
+        V2["flush()"]
+        V3["send('The end.')"]
+    end
+    
+    D --> V1
+    E --> V2
+    I --> V3
+    
+    style I3 fill:#ff9999
+    style V1 fill:#99ff99
+    style V2 fill:#ffcc99
+    style V3 fill:#99ff99
+        </div>
+
+        <h3>16.2 Timer vs Flush Behavior Comparison</h3>
+        <div class="mermaid">
+graph LR
+    subgraph "Normal Timer-Based Processing"
+        A1[Text without period] --> B1[Wait 1 second]
+        B1 --> C1[Timer fires]
+        C1 --> D1[Find word boundary]
+        D1 --> E1[Send partial chunk]
+    end
+    
+    subgraph "Flush-Based Processing"
+        A2[Text without period] --> B2[Flush marker added]
+        B2 --> C2[Immediate processing]
+        C2 --> D2[Send all text]
+        D2 --> E2[Send flush command]
+    end
+    
+    style B1 fill:#ffffcc
+    style C2 fill:#ccffcc
+        </div>
+
+        <h2>17. Summary</h2>
+        
+        <p>The TTS streaming implementation provides a robust, vendor-agnostic solution for real-time text-to-speech conversion with:</p>
+        <ul>
+            <li>Intelligent buffering with flow control</li>
+            <li>Sentence-aware text chunking</li>
+            <li>Timeout-based fallback mechanisms</li>
+            <li>Multi-vendor support through unified API</li>
+            <li>Comprehensive error handling</li>
+            <li>Event-driven architecture for reactive systems</li>
+        </ul>
+
+        <p>This architecture ensures low-latency, high-quality TTS streaming while managing resources efficiently and providing graceful degradation under various network and load conditions.</p>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

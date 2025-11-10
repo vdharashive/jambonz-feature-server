@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepgram Gather WebSocket Logic - Implementation Guide</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 600;
+        }
+        .subtitle {
+            margin-top: 10px;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            margin-bottom: 25px;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #667eea;
+            margin-top: 0;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e5e5;
+            font-size: 1.8em;
+        }
+        h3 {
+            color: #555;
+            margin-top: 25px;
+            font-size: 1.3em;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            line-height: 1.4;
+            font-size: 0.9em;
+        }
+        .code-block {
+            position: relative;
+        }
+        .code-label {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background-color: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .event-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .speech-detected {
+            background-color: #48bb78;
+            color: white;
+        }
+        .timeout {
+            background-color: #ed8936;
+            color: white;
+        }
+        .error {
+            background-color: #e53e3e;
+            color: white;
+        }
+        .dtmf {
+            background-color: #4299e1;
+            color: white;
+        }
+        .diagram-container {
+            background-color: #fafafa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        .flow-section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f7fafc;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .condition-list {
+            list-style: none;
+            padding: 0;
+        }
+        .condition-list li {
+            padding: 10px 0 10px 35px;
+            position: relative;
+        }
+        .condition-list li:before {
+            content: "✓";
+            color: #48bb78;
+            font-weight: bold;
+            position: absolute;
+            left: 10px;
+        }
+        .warning {
+            background-color: #fffbeb;
+            border-left: 4px solid #f6e05e;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .info {
+            background-color: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .json-example {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .json-key {
+            color: #9cdcfe;
+        }
+        .json-string {
+            color: #ce9178;
+        }
+        .json-number {
+            color: #b5cea8;
+        }
+        .json-boolean {
+            color: #569cd6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Deepgram Gather WebSocket Logic</h1>
+            <div class="subtitle">Implementation Guide for Speech Collection with Jambonz Gather Verb</div>
+        </div>
+
+        <div class="section">
+            <h2>Overview</h2>
+            <p>This document focuses specifically on how the <code>gather</code> verb handles Deepgram transcripts and sends them to WebSocket (actionHook) endpoints. The gather verb is used to collect user input via speech or DTMF digits.</p>
+            
+            <div class="info">
+                <strong>Key Features:</strong> The gather verb supports speech recognition, DTMF collection, bargein detection, continuous ASR, timeout handling, and multi-modal input collection.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Gather Configuration</h2>
+            
+            <h3>Basic Configuration Example</h3>
+            <div class="code-block">
+                <span class="code-label">gather.json</span>
+                <pre>{
+  "verb": "gather",
+  "actionHook": "wss://your-webhook-url",
+  "input": ["speech", "digits"],
+  "timeout": 5,                         // Overall timeout in seconds
+  "speechTimeout": 2,                   // Timeout after speech starts
+  "bargein": true,                      // Allow speech to interrupt prompts
+  "minBargeinWordCount": 1,             // Minimum words to trigger bargein
+  "say": {
+    "text": "Please tell me your name"
+  },
+  "recognizer": {
+    "vendor": "deepgram",
+    "language": "en-US",
+    "hints": ["name", "first name", "last name"],
+    "deepgramOptions": {
+      "model": "nova-2",
+      "punctuation": true,
+      "utteranceEndMs": 1500            // 1.5 seconds silence detection
+    }
+  }
+}</pre>
+            </div>
+
+            <h3>Continuous ASR Configuration</h3>
+            <div class="code-block">
+                <span class="code-label">gather-continuous.json</span>
+                <pre>{
+  "verb": "gather",
+  "actionHook": "wss://your-webhook-url",
+  "input": ["speech"],
+  "timeout": 0,                         // No timeout for continuous listening
+  "recognizer": {
+    "vendor": "deepgram",
+    "language": "en-US",
+    "asrTimeout": 2,                    // Enables continuous ASR mode (2 seconds)
+    "deepgramOptions": {
+      "utteranceEndMs": 2000            // Will use asrTimeout * 1000 if not specified
+    }
+  }
+}</pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Speech Detection Logic</h2>
+            
+            <h3>1. UtteranceEnd Event Processing</h3>
+            <div class="flow-section">
+                <p>When Deepgram detects end of speech (silence) in gather:</p>
+                <div class="code-block">
+                    <span class="code-label">gather.js - _onTranscription</span>
+                    <pre>if (this.vendor === 'deepgram' && evt.type === 'UtteranceEnd') {
+  /* we will only get this when we have set utterance_end_ms */
+  if (this._bufferedTranscripts.length === 0) {
+    this.logger.info('Gather:_onTranscription - got UtteranceEnd event from deepgram but no buffered transcripts');
+  }
+  else {
+    const utteranceTime = evt.last_word_end;
+    // Check if we have unprocessed words
+    if (utteranceTime && this._dgTimeOfLastUnprocessedWord && 
+        utteranceTime < this._dgTimeOfLastUnprocessedWord && utteranceTime != -1) {
+      this.logger.info('Gather:_onTranscription - got UtteranceEnd with unprocessed words, continue listening');
+    }
+    else {
+      this.logger.info('Gather:_onTranscription - got UtteranceEnd from deepgram, return buffered transcript');
+      evt = this.consolidateTranscripts(this._bufferedTranscripts, 1, this.language, this.vendor);
+      this._bufferedTranscripts = [];
+      this._resolve('speech', evt);
+    }
+  }
+  return;
+}</pre>
+                </div>
+                
+                <h4>Key Points:</h4>
+                <ul class="condition-list">
+                    <li>Requires <code>utteranceEndMs</code> to be configured (1000-5000ms range)</li>
+                    <li>Checks if all words have been processed using <code>last_word_end</code> timing</li>
+                    <li>Consolidates all buffered transcripts into a single final transcript</li>
+                    <li>Clears buffer after consolidation</li>
+                </ul>
+            </div>
+
+            <h3>2. Final Transcript Handling</h3>
+            <div class="flow-section">
+                <div class="code-block">
+                    <span class="code-label">gather.js - Final Transcript Processing</span>
+                    <pre>if (evt.is_final && !this.isContinuousAsr) {
+  if (this.vendor === 'deepgram') {
+    // Add to buffer if not empty
+    if (!emptyTranscript) this._bufferedTranscripts.push(evt);
+    
+    // Only send if we have buffered content
+    if (this._bufferedTranscripts.length > 0) {
+      evt = this.consolidateTranscripts(this._bufferedTranscripts, 1, this.language, this.vendor);
+      this._bufferedTranscripts = [];
+      this._resolve('speech', evt);
+    }
+  }
+}
+
+// For continuous ASR mode
+if (evt.is_final && this.isContinuousAsr) {
+  /* append the transcript and start listening again for asrTimeout */
+  const t = evt.alternatives[0].transcript;
+  if (t) {
+    /* remove trailing punctuation */
+    if (/[,;:\.!\?]$/.test(t)) {
+      evt.alternatives[0].transcript = t.slice(0, -1);
+    }
+  }
+  this._bufferedTranscripts.push(evt);
+  this._startAsrTimer();
+}</pre>
+                </div>
+            </div>
+
+            <h3>3. Speech Bargein Detection</h3>
+            <div class="flow-section">
+                <div class="code-block">
+                    <span class="code-label">gather.js - Bargein Logic</span>
+                    <pre>if (this.bargein && (words + bufferedWords) >= this.minBargeinWordCount) {
+  if (!this.playComplete) {
+    this.logger.debug({transcript: evt.alternatives[0].transcript}, 'killing audio due to speech');
+    this.emit('vad');
+    this.notifyStatus({event: 'speech-bargein-detected', ...evt});
+  }
+  this._killAudio(cs);
+}</pre>
+                </div>
+                
+                <div class="info">
+                    <strong>Bargein Behavior:</strong>
+                    <ul>
+                        <li>Triggers when word count meets <code>minBargeinWordCount</code></li>
+                        <li>Immediately stops any playing audio</li>
+                        <li>Sends status notification: <code>speech-bargein-detected</code></li>
+                        <li>Works with both interim and final transcripts</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Timeout Handling</h2>
+            
+            <h3>1. Main Timeout Timer</h3>
+            <div class="flow-section">
+                <div class="code-block">
+                    <span class="code-label">gather.js - Timeout Implementation</span>
+                    <pre>_startTimer() {
+  if (0 === this.timeout) return;  // timeout of 0 means no timeout
+  this.logger.debug(`Starting timoutTimer of ${this.timeout}ms`);
+  this._clearTimer();
+  this._timeoutTimer = setTimeout(() => {
+    // If continuousASR in use then extend by the asr window for more transcripts
+    if (this.isContinuousAsr) {
+      this._startAsrTimer();
+    } else {
+      this._resolve(this.digitBuffer.length >= this.minDigits ? 'dtmf-num-digits' : 'timeout');
+    }
+  }, this.timeout);
+}</pre>
+                </div>
+                
+                <h4>Timer Reset Conditions:</h4>
+                <ul class="condition-list">
+                    <li>Non-empty transcript received</li>
+                    <li>DTMF digit received</li>
+                    <li>Speech bargein detected</li>
+                    <li>Timer explicitly cleared</li>
+                </ul>
+            </div>
+
+            <h3>2. ASR Timer (Continuous Mode)</h3>
+            <div class="flow-section">
+                <div class="code-block">
+                    <span class="code-label">gather.js - ASR Timer</span>
+                    <pre>_startAsrTimer() {
+  // Note: Deepgram now uses ASR timer (comment shows evolution)
+  // "Deepgram has a case that UtteranceEnd is not sent to cover the last word end time"
+  assert(this.isContinuousAsr);
+  this._clearAsrTimer();
+  this._asrTimer = setTimeout(() => {
+    this.logger.info('_startAsrTimer - asr timer went off');
+    const evt = this.consolidateTranscripts(this._bufferedTranscripts, 1, this.language, this.vendor);
+    
+    /* special case for speechmatics - keep listening if we dont have any transcripts */
+    if (this.vendor === 'speechmatics' && this._bufferedTranscripts.length === 0) {
+      this.logger.debug('Gather:_startAsrTimer - speechmatics, no transcripts yet, keep listening');
+      this._startAsrTimer();
+      return;
+    }
+    this._resolve(this._bufferedTranscripts.length > 0 ? 'speech' : 'timeout', evt);
+  }, this.asrTimeout);
+}</pre>
+                </div>
+            </div>
+
+            <h3>3. Speech Timeout</h3>
+            <div class="flow-section">
+                <p>The <code>speechTimeout</code> parameter defines how long to wait after speech starts before ending collection:</p>
+                <ul class="condition-list">
+                    <li>Activates after first speech is detected</li>
+                    <li>Resets on each new transcript</li>
+                    <li>Useful for limiting response length</li>
+                    <li>Works independently from main timeout</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Event Resolution and WebSocket Messages</h2>
+            
+            <h3>1. Resolution Handler</h3>
+            <div class="flow-section">
+                <div class="code-block">
+                    <span class="code-label">gather.js - _resolve method</span>
+                    <pre>async _resolve(reason, evt) {
+  this.logger.info({evt}, `TaskGather:resolve with reason ${reason}`);
+  
+  // Stop transcription if needed
+  if (this.needsStt && this.ep && this.ep.connected) {
+    this._stopTranscribing(this.ep);
+  }
+  
+  // Clear all timers
+  clearTimeout(this.interDigitTimer);
+  this._clearTimer();
+  this._clearAsrTimer();
+  
+  // Calculate STT latency metrics
+  let sttLatencyMetrics = {};
+  if (this.needsStt) {
+    const sttLatency = this.cs.calculateSttLatency();
+    // ... calculate metrics
+  }
+  
+  // Handle different resolution reasons
+  if (reason.startsWith('speech')) {
+    this.cs.emit('userSaid', evt.alternatives[0].transcript);
+    returnedVerbs = await this.performAction({
+      speech: evt, 
+      reason: 'speechDetected', 
+      ...latencies
+    });
+  }
+  else if (reason.startsWith('timeout')) {
+    returnedVerbs = await this.performAction({
+      reason: 'timeout', 
+      ...latencies
+    });
+  }
+  else if (reason.startsWith('dtmf')) {
+    returnedVerbs = await this.performAction({
+      digits: this.digitBuffer, 
+      reason: 'dtmfDetected'
+    });
+  }
+  else if (reason.startsWith('stt-error')) {
+    returnedVerbs = await this.performAction({
+      reason: 'error', 
+      details: evt.error, 
+      ...latencies
+    });
+  }
+}</pre>
+                </div>
+            </div>
+
+            <h3>2. WebSocket Message Formats</h3>
+            
+            <h4>Speech Detected Message</h4>
+            <div class="json-example">
+<pre>{
+  <span class="json-key">"type"</span>: <span class="json-string">"verb:hook"</span>,
+  <span class="json-key">"msgid"</span>: <span class="json-string">"unique-message-id"</span>,
+  <span class="json-key">"call_sid"</span>: <span class="json-string">"call-session-id"</span>,
+  <span class="json-key">"hook"</span>: <span class="json-string">"wss://your-actionhook-url"</span>,
+  <span class="json-key">"data"</span>: {
+    <span class="json-key">"callSid"</span>: <span class="json-string">"call-session-id"</span>,
+    <span class="json-key">"direction"</span>: <span class="json-string">"inbound"</span>,
+    <span class="json-key">"from"</span>: <span class="json-string">"+1234567890"</span>,
+    <span class="json-key">"to"</span>: <span class="json-string">"+0987654321"</span>,
+    <span class="json-key">"speech"</span>: {
+      <span class="json-key">"language_code"</span>: <span class="json-string">"en-US"</span>,
+      <span class="json-key">"channel_tag"</span>: <span class="json-number">1</span>,
+      <span class="json-key">"is_final"</span>: <span class="json-boolean">true</span>,
+      <span class="json-key">"alternatives"</span>: [{
+        <span class="json-key">"transcript"</span>: <span class="json-string">"My name is John Smith"</span>,
+        <span class="json-key">"confidence"</span>: <span class="json-number">0.95</span>
+      }],
+      <span class="json-key">"vendor"</span>: {
+        <span class="json-key">"name"</span>: <span class="json-string">"deepgram"</span>,
+        <span class="json-key">"evt"</span>: <span class="json-comment">/* Array of consolidated events or single event */</span>
+      }
+    },
+    <span class="json-key">"reason"</span>: <span class="json-string">"speechDetected"</span>,
+    <span class="json-key">"stt_latency_ms"</span>: <span class="json-string">"250,180,320"</span>,
+    <span class="json-key">"stt_talkspurts"</span>: <span class="json-string">"[...]"</span>
+  }
+}</pre>
+            </div>
+
+            <h4>Timeout Message</h4>
+            <div class="json-example">
+<pre>{
+  <span class="json-key">"type"</span>: <span class="json-string">"verb:hook"</span>,
+  <span class="json-key">"msgid"</span>: <span class="json-string">"unique-message-id"</span>,
+  <span class="json-key">"call_sid"</span>: <span class="json-string">"call-session-id"</span>,
+  <span class="json-key">"hook"</span>: <span class="json-string">"wss://your-actionhook-url"</span>,
+  <span class="json-key">"data"</span>: {
+    <span class="json-key">"callSid"</span>: <span class="json-string">"call-session-id"</span>,
+    <span class="json-key">"direction"</span>: <span class="json-string">"inbound"</span>,
+    <span class="json-key">"from"</span>: <span class="json-string">"+1234567890"</span>,
+    <span class="json-key">"to"</span>: <span class="json-string">"+0987654321"</span>,
+    <span class="json-key">"reason"</span>: <span class="json-string">"timeout"</span>
+  }
+}</pre>
+            </div>
+
+            <h4>DTMF Message</h4>
+            <div class="json-example">
+<pre>{
+  <span class="json-key">"type"</span>: <span class="json-string">"verb:hook"</span>,
+  <span class="json-key">"msgid"</span>: <span class="json-string">"unique-message-id"</span>,
+  <span class="json-key">"call_sid"</span>: <span class="json-string">"call-session-id"</span>,
+  <span class="json-key">"hook"</span>: <span class="json-string">"wss://your-actionhook-url"</span>,
+  <span class="json-key">"data"</span>: {
+    <span class="json-key">"callSid"</span>: <span class="json-string">"call-session-id"</span>,
+    <span class="json-key">"direction"</span>: <span class="json-string">"inbound"</span>,
+    <span class="json-key">"from"</span>: <span class="json-string">"+1234567890"</span>,
+    <span class="json-key">"to"</span>: <span class="json-string">"+0987654321"</span>,
+    <span class="json-key">"digits"</span>: <span class="json-string">"12345#"</span>,
+    <span class="json-key">"reason"</span>: <span class="json-string">"dtmfDetected"</span>
+  }
+}</pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Special Deepgram Features</h2>
+            
+            <h3>1. Continuous ASR with Deepgram</h3>
+            <div class="flow-section">
+                <div class="code-block">
+                    <span class="code-label">stt-task.js - Deepgram Configuration</span>
+                    <pre>_doContinuousAsrWithDeepgram(asrTimeout) {
+  /* deepgram has an utterance_end_ms property that simplifies things */
+  assert(this.vendor === 'deepgram');
+  if (asrTimeout < 1000) {
+    this.notifyError({
+      msg: 'ASR error',
+      details:`asrTimeout ${asrTimeout} is too short for deepgram; setting it to 1000ms`
+    });
+    asrTimeout = 1000;
+  }
+  else if (asrTimeout > 5000) {
+    this.notifyError({
+      msg: 'ASR error',
+      details:`asrTimeout ${asrTimeout} is too long for deepgram; setting it to 5000ms`
+    });
+    asrTimeout = 5000;
+  }
+  const dgOptions = this.data.recognizer.deepgramOptions || {};
+  dgOptions.utteranceEndMs = dgOptions.utteranceEndMs || asrTimeout;
+}</pre>
+                </div>
+                
+                <div class="warning">
+                    <strong>Important Limits:</strong>
+                    <ul>
+                        <li>Minimum utteranceEndMs: 1000ms (1 second)</li>
+                        <li>Maximum utteranceEndMs: 5000ms (5 seconds)</li>
+                        <li>Values outside range are automatically clamped with error notification</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>2. Partial Final Transcripts</h3>
+            <div class="flow-section">
+                <p>Deepgram can send non-final transcripts with words marked as final:</p>
+                <div class="code-block">
+                    <span class="code-label">gather.js - Partial Final Handling</span>
+                    <pre>if (!evt.is_final && this.vendor === 'deepgram') {
+  const originalEvent = evt.vendor.evt;
+  if (originalEvent.is_final && evt.alternatives[0].transcript !== '') {
+    // Buffer this partial final transcript
+    this._bufferedTranscripts.push(evt);
+    this._dgTimeOfLastUnprocessedWord = null;
+  } else if (!originalEvent.is_final) {
+    // Track last unprocessed word time
+    const words = originalEvent.channel.alternatives[0].words;
+    if (words?.length > 0) {
+      this._dgTimeOfLastUnprocessedWord = words.slice(-1)[0].end;
+    }
+  }
+}</pre>
+                </div>
+            </div>
+
+            <h3>3. Transcript Consolidation</h3>
+            <div class="flow-section">
+                <p>Multiple transcripts are consolidated into a single final result:</p>
+                <ul class="condition-list">
+                    <li>Combines all buffered transcripts into one</li>
+                    <li>Averages confidence scores across transcripts</li>
+                    <li>Handles digit sequences specially (removes spaces)</li>
+                    <li>Preserves vendor event data for debugging</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Complete Gather Flow Diagram</h2>
+            <div class="diagram-container">
+                <div class="mermaid">
+                    graph TD
+                        A[Gather Start] --> B[Play Prompt]
+                        B --> C[Start Timeout Timer]
+                        C --> D[Listen for Input]
+                        
+                        D --> E{Input Type?}
+                        
+                        E -->|Speech| F[Deepgram Transcript]
+                        E -->|DTMF| G[DTMF Digit]
+                        E -->|Silence| H[Timeout]
+                        
+                        F --> I{Transcript Type?}
+                        I -->|Interim| J[Check Bargein]
+                        I -->|Final| K[Buffer Transcript]
+                        I -->|UtteranceEnd| L[Check Buffer]
+                        
+                        J --> M{Word Count >= minBargein?}
+                        M -->|Yes| N[Kill Audio]
+                        M -->|No| D
+                        
+                        K --> O{Continuous ASR?}
+                        O -->|Yes| P[Start ASR Timer]
+                        O -->|No| Q[Consolidate & Send]
+                        
+                        P --> D
+                        
+                        L --> R{Has Buffered?}
+                        R -->|Yes| S{All Words Processed?}
+                        R -->|No| D
+                        
+                        S -->|Yes| T[Consolidate All]
+                        S -->|No| D
+                        
+                        T --> U[_resolve('speech')]
+                        Q --> U
+                        
+                        G --> V[Add to Buffer]
+                        V --> W{Finish Key?}
+                        W -->|Yes| X[_resolve('dtmf')]
+                        W -->|No| Y[Inter-digit Timer]
+                        
+                        H --> Z{Continuous ASR?}
+                        Z -->|Yes| AA[Start ASR Timer]
+                        Z -->|No| AB[_resolve('timeout')]
+                        
+                        AA --> AC{Buffer Empty?}
+                        AC -->|No| AD[Consolidate]
+                        AC -->|Yes| AB
+                        AD --> U
+                        
+                        U --> AE[performAction]
+                        X --> AE
+                        AB --> AE
+                        
+                        AE --> AF[Send to WebSocket]
+                        AF --> AG[Wait Response]
+                        AG --> AH[Process Verbs]
+                        
+                        style A fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+                        style U fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px
+                        style AF fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+                        style L fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Common Use Cases</h2>
+            
+            <h3>1. Simple Voice Input</h3>
+            <div class="code-block">
+                <span class="code-label">Basic voice collection</span>
+                <pre>{
+  "verb": "gather",
+  "actionHook": "wss://your-app/voice-input",
+  "input": ["speech"],
+  "timeout": 5,
+  "say": "Please say your name",
+  "recognizer": {
+    "vendor": "deepgram",
+    "language": "en-US"
+  }
+}</pre>
+            </div>
+
+            <h3>2. Voice with DTMF Fallback</h3>
+            <div class="code-block">
+                <span class="code-label">Multi-modal input</span>
+                <pre>{
+  "verb": "gather",
+  "actionHook": "wss://your-app/menu-selection",
+  "input": ["speech", "digits"],
+  "timeout": 10,
+  "finishOnKey": "#",
+  "numDigits": 1,
+  "say": "Say or press 1 for sales, 2 for support",
+  "recognizer": {
+    "vendor": "deepgram",
+    "language": "en-US",
+    "hints": ["one", "two", "sales", "support"]
+  }
+}</pre>
+            </div>
+
+            <h3>3. Continuous Conversation</h3>
+            <div class="code-block">
+                <span class="code-label">Continuous ASR for conversation</span>
+                <pre>{
+  "verb": "gather",
+  "actionHook": "wss://your-app/conversation",
+  "input": ["speech"],
+  "timeout": 0,
+  "bargein": false,
+  "recognizer": {
+    "vendor": "deepgram",
+    "language": "en-US",
+    "asrTimeout": 2,
+    "deepgramOptions": {
+      "model": "nova-2",
+      "punctuation": true,
+      "utteranceEndMs": 2000,
+      "smart_format": true
+    }
+  }
+}</pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Best Practices</h2>
+            
+            <div class="flow-section">
+                <h3>1. Timeout Configuration</h3>
+                <ul class="condition-list">
+                    <li>Use <code>timeout: 0</code> for continuous listening scenarios</li>
+                    <li>Set reasonable <code>speechTimeout</code> to prevent overly long responses</li>
+                    <li>Configure <code>utteranceEndMs</code> based on expected pause patterns</li>
+                    <li>Use <code>interDigitTimeout</code> for DTMF collection (default 3s)</li>
+                </ul>
+            </div>
+
+            <div class="flow-section">
+                <h3>2. Bargein Settings</h3>
+                <ul class="condition-list">
+                    <li>Enable <code>bargein</code> for better user experience in IVR</li>
+                    <li>Set <code>minBargeinWordCount</code> > 1 to prevent false triggers</li>
+                    <li>Use <code>dtmfBargein: false</code> to let prompts complete for DTMF</li>
+                    <li>Monitor <code>speech-bargein-detected</code> status events</li>
+                </ul>
+            </div>
+
+            <div class="flow-section">
+                <h3>3. Deepgram Optimization</h3>
+                <ul class="condition-list">
+                    <li>Use appropriate Deepgram model (nova-2 for general, phonecall for telephony)</li>
+                    <li>Enable <code>smart_format</code> for better formatting</li>
+                    <li>Provide <code>hints</code> for expected vocabulary</li>
+                    <li>Keep <code>utteranceEndMs</code> between 1000-2000ms for natural conversation</li>
+                </ul>
+            </div>
+
+            <div class="flow-section">
+                <h3>4. Error Handling</h3>
+                <ul class="condition-list">
+                    <li>Always handle timeout responses gracefully</li>
+                    <li>Implement retry logic for STT errors</li>
+                    <li>Monitor STT_FAILURE alerts in production</li>
+                    <li>Configure fallback STT vendors for reliability</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Summary</h2>
+            <p>The gather verb with Deepgram provides a powerful and flexible way to collect user input via speech. Key features include:</p>
+            
+            <div class="info">
+                <ul>
+                    <li><strong>Intelligent Speech Detection:</strong> Using UtteranceEnd events and transcript buffering</li>
+                    <li><strong>Continuous ASR:</strong> For ongoing conversation scenarios</li>
+                    <li><strong>Multi-modal Input:</strong> Combined speech and DTMF collection</li>
+                    <li><strong>Flexible Timeouts:</strong> Main timeout, speech timeout, and ASR timeout</li>
+                    <li><strong>Bargein Support:</strong> Interrupt prompts based on speech detection</li>
+                    <li><strong>WebSocket Integration:</strong> Real-time event delivery via actionHook</li>
+                </ul>
+            </div>
+            
+            <p>The implementation handles edge cases, provides detailed event information, and ensures reliable speech collection for various telephony applications.</p>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

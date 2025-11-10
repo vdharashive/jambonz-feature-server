@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepgram Transcript WebSocket Logic - Comprehensive Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 600;
+        }
+        .subtitle {
+            margin-top: 10px;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            margin-bottom: 25px;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #667eea;
+            margin-top: 0;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e5e5;
+            font-size: 1.8em;
+        }
+        h3 {
+            color: #555;
+            margin-top: 25px;
+            font-size: 1.3em;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            line-height: 1.4;
+            font-size: 0.9em;
+        }
+        .code-block {
+            position: relative;
+        }
+        .code-label {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .table-responsive {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background-color: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .event-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .speech-detected {
+            background-color: #48bb78;
+            color: white;
+        }
+        .timeout {
+            background-color: #ed8936;
+            color: white;
+        }
+        .error {
+            background-color: #e53e3e;
+            color: white;
+        }
+        .diagram-container {
+            background-color: #fafafa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        .flow-section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f7fafc;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .condition-list {
+            list-style: none;
+            padding: 0;
+        }
+        .condition-list li {
+            padding: 10px 0 10px 35px;
+            position: relative;
+        }
+        .condition-list li:before {
+            content: "✓";
+            color: #48bb78;
+            font-weight: bold;
+            position: absolute;
+            left: 10px;
+        }
+        .warning {
+            background-color: #fffbeb;
+            border-left: 4px solid #f6e05e;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .info {
+            background-color: #ebf8ff;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .json-example {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .json-key {
+            color: #9cdcfe;
+        }
+        .json-string {
+            color: #ce9178;
+        }
+        .json-number {
+            color: #b5cea8;
+        }
+        .json-boolean {
+            color: #569cd6;
+        }
+        .update-note {
+            background-color: #f0e6ff;
+            border-left: 4px solid #8b5cf6;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Deepgram Transcript WebSocket Logic</h1>
+            <div class="subtitle">Comprehensive Documentation for Speech Detection, Continuous ASR, and Timeout Handling</div>
+        </div>
+
+        <div class="section">
+            <div class="update-note">
+                <strong>Updated:</strong> This document now includes the specific implementation details for speech_final handling and continuous ASR/asrTimeout logic in the Deepgram transcribe feature.
+            </div>
+            <h2>Overview</h2>
+            <p>This document provides comprehensive documentation of how transcripts are sent to WebSocket (WSS) endpoints when speech is detected, timeout occurs, or errors are triggered from Deepgram transcribe in the Jambonz feature server.</p>
+            
+            <div class="info">
+                <strong>Key Concepts:</strong> The system uses event-driven architecture to handle Deepgram transcription events, buffering partial transcripts, and consolidating them before sending to WebSocket endpoints. Special handling is implemented for continuous ASR and speech_final events.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Deepgram Event Types</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Event Type</th>
+                        <th>Description</th>
+                        <th>Action Taken</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Transcript</code></td>
+                        <td>Contains actual transcription data (interim or final)</td>
+                        <td>Process based on <code>is_final</code> flag and continuous ASR mode</td>
+                    </tr>
+                    <tr>
+                        <td><code>UtteranceEnd</code></td>
+                        <td>Signals end of utterance when <code>utteranceEndMs</code> is configured</td>
+                        <td>Consolidate buffered transcripts and send (special handling for transcribe vs gather)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Metadata</code></td>
+                        <td>Configuration metadata</td>
+                        <td>Discarded</td>
+                    </tr>
+                    <tr>
+                        <td><code>Error</code></td>
+                        <td>Error from Deepgram service</td>
+                        <td>Trigger error handling and alerts</td>
+                    </tr>
+                    <tr>
+                        <td><code>ConnectFailure</code></td>
+                        <td>Failed to connect to Deepgram</td>
+                        <td>Attempt fallback or notify error</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Speech Detection Conditions</h2>
+            
+            <h3>1. UtteranceEnd Event (Silence Detection)</h3>
+            <div class="flow-section">
+                <p>When Deepgram detects the end of speech through silence detection:</p>
+                
+                <h4>For Transcribe Task:</h4>
+                <div class="code-block">
+                    <span class="code-label">transcribe.js</span>
+                    <pre>if (this.vendor === 'deepgram' && evt.type === 'UtteranceEnd') {
+  /* we will only get this when we have set utterance_end_ms */
+  
+  /* DH: send a speech event when we get UtteranceEnd if they want interim events */
+  if (this.interim) {
+    this.logger.debug('Gather:_onTranscription - got UtteranceEnd event from deepgram, sending speech event');
+    this._resolve(channel, evt);
+  }
+  if (bufferedTranscripts.length === 0) {
+    this.logger.debug('Gather:_onTranscription - got UtteranceEnd event from deepgram but no buffered transcripts');
+  }
+  else {
+    this.logger.debug('Gather:_onTranscription - got UtteranceEnd event from deepgram, return buffered transcript');
+    evt = this.consolidateTranscripts(bufferedTranscripts, channel, this.language, this.vendor);
+    evt.is_final = true;
+    this._bufferedTranscripts[channel - 1] = [];
+    this._resolve(channel, evt);
+  }
+  return;
+}</pre>
+                </div>
+                
+                <h4>Key Differences in Transcribe Task:</h4>
+                <ul class="condition-list">
+                    <li>If <code>interim</code> is enabled, sends speech event immediately on UtteranceEnd</li>
+                    <li>Always consolidates and sends buffered transcripts if they exist</li>
+                    <li>No checking of <code>last_word_end</code> time like in gather task</li>
+                    <li>Clears buffer after consolidating and sending</li>
+                </ul>
+            </div>
+
+            <h3>2. Final Transcript Processing with Continuous ASR</h3>
+            <div class="flow-section">
+                <p>When a final transcript is received from Deepgram with continuous ASR enabled:</p>
+                <div class="code-block">
+                    <span class="code-label">transcribe.js</span>
+                    <pre>if (evt.is_final) {
+  // Handle empty transcript cases
+  if (evt.alternatives.length === 0 || evt.alternatives[0].transcript === '') {
+    emptyTranscript = true;
+    // Special handling for Deepgram with continuous ASR
+    else if (this.isContinuousAsr) {
+      this.logger.info({evt}, 
+        'TaskGather:_onTranscription - got empty deepgram transcript during continous asr, continue listening');
+      return;
+    }
+  }
+  
+  if (this.isContinuousAsr) {
+    /* append the transcript and start listening again for asrTimeout */
+    const t = evt.alternatives[0].transcript;
+    if (t) {
+      /* remove trailing punctuation */
+      if (/[,;:\.!\?]$/.test(t)) {
+        this.logger.debug('TaskGather:_onTranscription - removing trailing punctuation');
+        evt.alternatives[0].transcript = t.slice(0, -1);
+      }
+    }
+    this.logger.info({evt}, 'TaskGather:_onTranscription - got transcript during continous asr');
+    bufferedTranscripts.push(evt);
+    this._startAsrTimer(channel);
+    
+    /* some STT engines will keep listening after a final response, so no need to restart */
+    if (!this.doesVendorContinueListeningAfterFinalTranscript(this.vendor)) {
+      // Restart listening for non-Deepgram vendors
+    }
+  }
+}</pre>
+                </div>
+                
+                <h4>Continuous ASR Behavior:</h4>
+                <ul class="condition-list">
+                    <li>Final transcripts are buffered when continuous ASR is enabled</li>
+                    <li>Trailing punctuation is removed from transcripts</li>
+                    <li>ASR timer is started after each final transcript (except for Deepgram)</li>
+                    <li>Empty transcripts during continuous ASR continue listening</li>
+                </ul>
+            </div>
+
+            <h3>3. Continuous ASR with Deepgram Configuration</h3>
+            <div class="flow-section">
+                <p>Deepgram has special handling for continuous ASR using <code>utteranceEndMs</code>:</p>
+                <div class="code-block">
+                    <span class="code-label">stt-task.js</span>
+                    <pre>_doContinuousAsrWithDeepgram(asrTimeout) {
+  /* deepgram has an utterance_end_ms property that simplifies things */
+  assert(this.vendor === 'deepgram');
+  if (asrTimeout < 1000) {
+    this.notifyError({
+      msg: 'ASR error',
+      details:`asrTimeout ${asrTimeout} is too short for deepgram; setting it to 1000ms`
+    });
+    asrTimeout = 1000;
+  }
+  else if (asrTimeout > 5000) {
+    this.notifyError({
+      msg: 'ASR error',
+      details:`asrTimeout ${asrTimeout} is too long for deepgram; setting it to 5000ms`
+    });
+    asrTimeout = 5000;
+  }
+  this.logger.debug(`_doContinuousAsrWithDeepgram - setting utterance_end_ms to ${asrTimeout}`);
+  const dgOptions = this.data.recognizer.deepgramOptions = this.data.recognizer.deepgramOptions || {};
+  dgOptions.utteranceEndMs = dgOptions.utteranceEndMs || asrTimeout;
+}</pre>
+                </div>
+                
+                <div class="warning">
+                    <strong>Important:</strong> Deepgram enforces strict limits on <code>utteranceEndMs</code>:
+                    <ul>
+                        <li>Minimum: 1000ms (1 second)</li>
+                        <li>Maximum: 5000ms (5 seconds)</li>
+                        <li>Values outside this range are automatically adjusted with error notifications</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>4. ASR Timer Handling</h3>
+            <div class="flow-section">
+                <p>Different behavior for Deepgram vs other vendors:</p>
+                
+                <h4>Transcribe Task ASR Timer:</h4>
+                <div class="code-block">
+                    <span class="code-label">transcribe.js</span>
+                    <pre>_startAsrTimer(channel) {
+  if (this.vendor === 'deepgram') return; // no need
+  assert(this.isContinuousAsr);
+  this._clearAsrTimer(channel);
+  this._asrTimer = setTimeout(() => {
+    this.logger.debug(`TaskTranscribe:_startAsrTimer - asr timer went off for channel: ${channel}`);
+    const evt = this.consolidateTranscripts(
+      this._bufferedTranscripts[channel - 1], channel, this.language, this.vendor);
+    this._bufferedTranscripts[channel - 1] = [];
+    this._resolve(channel, evt);
+  }, this.asrTimeout);
+  this.logger.debug(`TaskTranscribe:_startAsrTimer: set for ${this.asrTimeout}ms for channel ${channel}`);
+}</pre>
+                </div>
+                
+                <h4>Key Points:</h4>
+                <ul class="condition-list">
+                    <li>Deepgram does NOT use ASR timer in transcribe task - relies on UtteranceEnd events</li>
+                    <li>Other vendors use ASR timer to consolidate buffered transcripts</li>
+                    <li>Timer is per-channel in transcribe task</li>
+                    <li>When timer fires, all buffered transcripts are consolidated and sent</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Timeout Conditions</h2>
+            
+            <h3>1. Continuous ASR Timeout Configuration</h3>
+            <div class="flow-section">
+                <p>ASR timeout is configured differently for transcribe tasks:</p>
+                <div class="code-block">
+                    <span class="code-label">transcribe.js</span>
+                    <pre>// Continuous asr timeout
+this.asrTimeout = typeof this.data.recognizer.asrTimeout === 'number' ? 
+    this.data.recognizer.asrTimeout * 1000 : 0;
+if (this.asrTimeout > 0) {
+  this.isContinuousAsr = true;
+}</pre>
+                </div>
+                
+                <h4>Configuration:</h4>
+                <ul class="condition-list">
+                    <li>asrTimeout is specified in seconds in the recognizer configuration</li>
+                    <li>Converted to milliseconds internally</li>
+                    <li>If asrTimeout > 0, continuous ASR mode is enabled</li>
+                    <li>For Deepgram, this value maps to utteranceEndMs (with 1-5 second limits)</li>
+                </ul>
+            </div>
+
+            <h3>2. Special Deepgram Behavior in Gather Task</h3>
+            <div class="flow-section">
+                <div class="code-block">
+                    <span class="code-label">gather.js (commented code shows evolving logic)</span>
+                    <pre>_startAsrTimer() {
+  // Deepgram has a case that UtteranceEnd is not sent to cover the last word end time.
+  // So we need to wait for the asrTimeout to be sure that the last word is sent.
+  // if (this.vendor === 'deepgram') return; // no need
+  assert(this.isContinuousAsr);
+  this._clearAsrTimer();
+  this._asrTimer = setTimeout(() => {
+    this.logger.info('_startAsrTimer - asr timer went off');
+    const evt = this.consolidateTranscripts(this._bufferedTranscripts, 1, this.language, this.vendor);
+    
+    /* special case for speechmatics - keep listening if we dont have any transcripts */
+    if (this.vendor === 'speechmatics' && this._bufferedTranscripts.length === 0) {
+      this.logger.debug('Gather:_startAsrTimer - speechmatics, no transcripts yet, keep listening');
+      this._startAsrTimer();
+      return;
+    }
+    this._resolve(this._bufferedTranscripts.length > 0 ? 'speech' : 'timeout', evt);
+  }, this.asrTimeout);
+}</pre>
+                </div>
+                
+                <div class="info">
+                    <strong>Note:</strong> The comment shows that Deepgram's ASR timer handling in gather tasks has evolved. Initially it was disabled (returned early), but now it runs to handle cases where UtteranceEnd might not cover the last word.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>WebSocket Message Flow</h2>
+            
+            <h3>1. Transcribe Task Message Flow</h3>
+            <div class="flow-section">
+                <p>When transcripts are resolved in the transcribe task:</p>
+                <div class="code-block">
+                    <span class="code-label">transcribe.js - _resolve method</span>
+                    <pre>async _resolve(channel, evt) {
+  let sttLatencyMetrics = {};
+  if (evt.is_final) {
+    const sttLatency = this.cs.calculateSttLatency();
+    // ... calculate latency metrics
+  }
+  
+  if (this.transcriptionHook) {
+    const b3 = this.getTracingPropagation();
+    const httpHeaders = b3 && {b3};
+    const latencies = Object.fromEntries(
+      Object.entries(sttLatencyMetrics).map(([key, value]) => [key.replace('stt.', 'stt_'), value])
+    );
+    const payload = {
+      ...this.cs.callInfo,
+      ...httpHeaders,
+      ...latencies,
+      ...(evt.alternatives && {speech: evt}),
+      ...(evt.type && {speechEvent: evt})
+    };
+    try {
+      this.logger.debug({payload}, 'sending transcriptionHook');
+      const json = await this.cs.requestor.request('verb:hook', this.transcriptionHook, payload);
+      this.logger.info({json}, 'completed transcriptionHook');
+      // Handle returned verbs if any...
+    } catch (err) {
+      this.logger.info(err, 'TranscribeTask:_onTranscription error');
+    }
+  }
+  
+  // Restart listening span for final transcripts
+  else if (evt.is_final) {
+    /* start another child span for this channel */
+    const {span, ctx} = this.startChildSpan(`${STT_LISTEN_SPAN_NAME}:${channel}`);
+    this.childSpan[channel - 1] = {span, ctx};
+  }
+}</pre>
+                </div>
+            </div>
+
+            <h3>2. Speech Event Message for Transcribe</h3>
+            <div class="json-example">
+<pre>{
+  <span class="json-key">"type"</span>: <span class="json-string">"verb:hook"</span>,
+  <span class="json-key">"msgid"</span>: <span class="json-string">"unique-message-id"</span>,
+  <span class="json-key">"call_sid"</span>: <span class="json-string">"call-session-id"</span>,
+  <span class="json-key">"hook"</span>: <span class="json-string">"wss://your-transcription-hook-url"</span>,
+  <span class="json-key">"data"</span>: {
+    <span class="json-key">"callSid"</span>: <span class="json-string">"call-session-id"</span>,
+    <span class="json-key">"direction"</span>: <span class="json-string">"inbound"</span>,
+    <span class="json-key">"from"</span>: <span class="json-string">"+1234567890"</span>,
+    <span class="json-key">"to"</span>: <span class="json-string">"+0987654321"</span>,
+    <span class="json-key">"speech"</span>: {
+      <span class="json-key">"language_code"</span>: <span class="json-string">"en-US"</span>,
+      <span class="json-key">"channel_tag"</span>: <span class="json-number">1</span>,
+      <span class="json-key">"is_final"</span>: <span class="json-boolean">true</span>,
+      <span class="json-key">"alternatives"</span>: [{
+        <span class="json-key">"transcript"</span>: <span class="json-string">"Hello, how can I help you today?"</span>,
+        <span class="json-key">"confidence"</span>: <span class="json-number">0.95</span>
+      }],
+      <span class="json-key">"vendor"</span>: {
+        <span class="json-key">"name"</span>: <span class="json-string">"deepgram"</span>,
+        <span class="json-key">"evt"</span>: { <span class="json-comment">/* original deepgram event or array of buffered events */</span> }
+      }
+    },
+    <span class="json-comment">/* STT latency metrics if is_final */</span>
+    <span class="json-key">"stt_latency_ms"</span>: <span class="json-string">"250"</span>,
+    <span class="json-key">"stt_talkspurts"</span>: <span class="json-string">"[...]"</span>,
+    <span class="json-key">"stt_start_time"</span>: <span class="json-string">"timestamp"</span>,
+    <span class="json-key">"stt_stop_time"</span>: <span class="json-string">"timestamp"</span>,
+    <span class="json-key">"stt_usage"</span>: <span class="json-string">"usage_info"</span>
+  }
+}</pre>
+            </div>
+
+            <h3>3. UtteranceEnd Event Message</h3>
+            <div class="json-example">
+<pre>{
+  <span class="json-key">"type"</span>: <span class="json-string">"verb:hook"</span>,
+  <span class="json-key">"msgid"</span>: <span class="json-string">"unique-message-id"</span>,
+  <span class="json-key">"call_sid"</span>: <span class="json-string">"call-session-id"</span>,
+  <span class="json-key">"hook"</span>: <span class="json-string">"wss://your-transcription-hook-url"</span>,
+  <span class="json-key">"data"</span>: {
+    <span class="json-key">"callSid"</span>: <span class="json-string">"call-session-id"</span>,
+    <span class="json-key">"direction"</span>: <span class="json-string">"inbound"</span>,
+    <span class="json-key">"from"</span>: <span class="json-string">"+1234567890"</span>,
+    <span class="json-key">"to"</span>: <span class="json-string">"+0987654321"</span>,
+    <span class="json-key">"speechEvent"</span>: {
+      <span class="json-key">"type"</span>: <span class="json-string">"UtteranceEnd"</span>,
+      <span class="json-key">"last_word_end"</span>: <span class="json-number">2.45</span>,
+      <span class="json-key">"channel"</span>: <span class="json-number">0</span>
+    }
+  }
+}</pre>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Processing Flow Diagram - Transcribe Task</h2>
+            <div class="diagram-container">
+                <div class="mermaid">
+                    graph TD
+                        A[Deepgram Event Received] --> B{Event Type?}
+                        
+                        B -->|"Transcript"| C[Transcript Event]
+                        B -->|"UtteranceEnd"| D[UtteranceEnd Event]
+                        B -->|"Error"| E[Error Event]
+                        
+                        C --> H{Is Final?}
+                        H -->|"Yes"| I{Empty Transcript?}
+                        H -->|"No"| J[Interim Transcript]
+                        
+                        I -->|"No"| K{Continuous ASR?}
+                        I -->|"Yes"| L{Continuous ASR?}
+                        
+                        L -->|"Yes"| M[Continue Listening]
+                        L -->|"No"| N[Skip or Process Buffered]
+                        
+                        K -->|"Yes"| O[Buffer Transcript]
+                        K -->|"No"| P[Send Immediately]
+                        
+                        O --> Q[Remove Punctuation]
+                        Q --> R{Deepgram Vendor?}
+                        R -->|"Yes"| S[No ASR Timer]
+                        R -->|"No"| T[Start ASR Timer]
+                        
+                        D --> U{Interim Enabled?}
+                        U -->|"Yes"| V[Send Event]
+                        U -->|"No"| W[Check Buffer]
+                        
+                        V --> W
+                        W --> X{Has Buffered?}
+                        X -->|"Yes"| Y[Consolidate All]
+                        X -->|"No"| Z[Log Empty]
+                        
+                        Y --> AA[Mark Final]
+                        AA --> AB[Clear Buffer]
+                        AB --> AC[Send to Hook]
+                        
+                        P --> AC
+                        
+                        AC --> AD[transcriptionHook]
+                        AD --> AE{Response?}
+                        AE -->|"Verbs"| AF[Replace App]
+                        AE -->|"Empty"| AG[Continue]
+                        
+                        T --> AH[Timer Fires]
+                        AH --> AI[Consolidate]
+                        AI --> AJ[Clear Buffer]
+                        AJ --> AC
+                        
+                        style D fill:#f9f,stroke:#333,stroke-width:2px
+                        style Y fill:#bbf,stroke:#333,stroke-width:2px
+                        style AC fill:#bfb,stroke:#333,stroke-width:2px
+                        style O fill:#ffc,stroke:#333,stroke-width:2px
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Event Triggering Logic</h2>
+            
+            <h3>1. Speech Detected Trigger</h3>
+            <div class="flow-section">
+                <p>Speech is detected and triggers the <code>speechDetected</code> event when:</p>
+                
+                <h4>In Gather Task:</h4>
+                <div class="code-block">
+                    <span class="code-label">gather.js - _resolve method</span>
+                    <pre>else if (reason.startsWith('speech')) {
+  this.cs.emit('userSaid', evt.alternatives[0].transcript);
+  if (this.parentTask) this.parentTask.emit('transcription', evt);
+  else {
+    this.emit('transcription', evt);
+    this.logger.debug('TaskGather:_resolve - invoking performAction');
+    returnedVerbs = await this.performAction({speech: evt, reason: 'speechDetected', ...latencies});
+    this.logger.debug({returnedVerbs}, 'TaskGather:_resolve - back from performAction');
+  }
+}</pre>
+                </div>
+                
+                <h4>Trigger Conditions:</h4>
+                <ul class="condition-list">
+                    <li><strong>Final transcript received:</strong> When <code>is_final: true</code> and transcript is not empty</li>
+                    <li><strong>UtteranceEnd with buffer:</strong> When Deepgram sends UtteranceEnd and buffered transcripts exist</li>
+                    <li><strong>Continuous ASR buffer full:</strong> When ASR timer fires and consolidates buffered transcripts</li>
+                    <li><strong>Speech bargein detected:</strong> When word count meets <code>minBargeinWordCount</code> threshold</li>
+                </ul>
+                
+                <h4>In Transcribe Task:</h4>
+                <p>Transcripts are sent via <code>transcriptionHook</code> without waiting for a "speechDetected" reason - they're sent immediately when:</p>
+                <ul class="condition-list">
+                    <li>Final transcript is received (after buffering if continuous ASR)</li>
+                    <li>UtteranceEnd event occurs (if interim is enabled)</li>
+                    <li>ASR timer expires (for non-Deepgram vendors)</li>
+                </ul>
+            </div>
+
+            <h3>2. Timeout Trigger</h3>
+            <div class="flow-section">
+                <p>Timeouts are triggered through multiple mechanisms:</p>
+                
+                <h4>Main Gather Timeout:</h4>
+                <div class="code-block">
+                    <span class="code-label">gather.js - _startTimer method</span>
+                    <pre>_startTimer() {
+  if (0 === this.timeout) return;
+  this.logger.debug(`Starting timoutTimer of ${this.timeout}ms`);
+  this._clearTimer();
+  this._timeoutTimer = setTimeout(() => {
+    // If continuousASR in use then extend by the asr window for more transcripts.
+    if (this.isContinuousAsr) this._startAsrTimer();
+    else {
+      this._resolve(this.digitBuffer.length >= this.minDigits ? 'dtmf-num-digits' : 'timeout');
+    }
+  }, this.timeout);
+}</pre>
+                </div>
+                
+                <h4>Timeout Processing:</h4>
+                <div class="code-block">
+                    <span class="code-label">gather.js - _resolve method</span>
+                    <pre>else if (reason.startsWith('timeout')) {
+  if (this.parentTask) this.parentTask.emit('timeout', evt);
+  else {
+    this.emit('timeout', evt);
+    returnedVerbs = await this.performAction({reason: 'timeout', ...latencies});
+  }
+}</pre>
+                </div>
+                
+                <h4>Timeout Triggers:</h4>
+                <ul class="condition-list">
+                    <li><strong>No input timeout:</strong> When <code>timeout</code> period expires with no speech or DTMF</li>
+                    <li><strong>ASR timeout:</strong> When continuous ASR is enabled and no utterance end received</li>
+                    <li><strong>Inter-digit timeout:</strong> When collecting DTMF and pause between digits exceeds <code>interDigitTimeout</code></li>
+                    <li><strong>Speech timeout:</strong> When <code>speechTimeout</code> expires after initial speech detection</li>
+                </ul>
+                
+                <div class="warning">
+                    <strong>Important:</strong> The timeout timer is reset when:
+                    <ul>
+                        <li>Speech is detected (non-empty transcript received)</li>
+                        <li>DTMF digit is received</li>
+                        <li>Timer is cleared by bargein or other interruptions</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>3. Error Trigger</h3>
+            <div class="flow-section">
+                <p>Errors are triggered when STT vendors report failures:</p>
+                
+                <h4>Vendor Error Handler:</h4>
+                <div class="code-block">
+                    <span class="code-label">stt-task.js - Error Handlers</span>
+                    <pre>_onVendorError(cs, _ep, evt) {
+  this.logger.info({evt}, `${this.name}:_on${this.vendor}Error`);
+  const {writeAlerts, AlertType} = cs.srf.locals;
+  writeAlerts({
+    account_sid: cs.accountSid,
+    alert_type: AlertType.STT_FAILURE,
+    message: 'STT failure reported by vendor',
+    detail: evt.error,
+    vendor: this.vendor,
+    target_sid: cs.callSid
+  }).catch((err) => this.logger.info({err}, `Error generating alert for ${this.vendor} connection failure`));
+}
+
+_onVendorConnectFailure(cs, _ep, evt) {
+  const {reason} = evt;
+  const {writeAlerts, AlertType} = cs.srf.locals;
+  this.logger.info({evt}, `${this.name}:_on${this.vendor}ConnectFailure`);
+  writeAlerts({
+    account_sid: cs.accountSid,
+    alert_type: AlertType.STT_FAILURE,
+    message: `Failed connecting to ${this.vendor} speech recognizer: ${reason}`,
+    vendor: this.vendor,
+    target_sid: cs.callSid
+  }).catch((err) => this.logger.info({err}, `Error generating alert for ${this.vendor} connection failure`));
+}</pre>
+                </div>
+                
+                <h4>Error Processing in Gather:</h4>
+                <div class="code-block">
+                    <span class="code-label">gather.js - Error Resolution</span>
+                    <pre>else if (reason.startsWith('stt-error')) {
+  if (this.parentTask) this.parentTask.emit('stt-error', evt);
+  else {
+    this.emit('stt-error', evt);
+    returnedVerbs = await this.performAction({reason: 'error', details: evt.error, ...latencies});
+  }
+}</pre>
+                </div>
+                
+                <h4>Error Types:</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Error Type</th>
+                            <th>Trigger Condition</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="event-type error">ConnectFailure</span></td>
+                            <td>Failed to establish WebSocket to vendor</td>
+                            <td>Generate STT_FAILURE alert, attempt fallback</td>
+                        </tr>
+                        <tr>
+                            <td><span class="event-type error">VendorError</span></td>
+                            <td>Runtime error from STT service</td>
+                            <td>Generate STT_FAILURE alert, send error to hook</td>
+                        </tr>
+                        <tr>
+                            <td><span class="event-type error">Low Confidence</span></td>
+                            <td>Transcript confidence below threshold</td>
+                            <td>Send stt-low-confidence event</td>
+                        </tr>
+                        <tr>
+                            <td><span class="event-type timeout">No Audio</span></td>
+                            <td>No audio detected by vendor</td>
+                            <td>Resolve with timeout reason</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="info">
+                    <strong>Note:</strong> All STT errors generate alerts that are stored for monitoring and debugging. Fallback vendors are attempted automatically when configured.
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Event Flow Examples</h2>
+            
+            <h3>1. Complete Speech Detection Flow</h3>
+            <div class="diagram-container">
+                <div class="mermaid">
+                    graph TD
+                        A[User Speaks] --> B[Audio Stream to Deepgram]
+                        B --> C{Transcript Type}
+                        
+                        C -->|Interim| D[Buffer Transcript]
+                        C -->|Final| E[Process Final]
+                        
+                        E --> F{Continuous ASR?}
+                        F -->|Yes| G[Buffer & Continue]
+                        F -->|No| H[Send Immediately]
+                        
+                        G --> I[Wait for UtteranceEnd]
+                        I --> J[Consolidate Buffer]
+                        
+                        D --> K[Track Last Word Time]
+                        K --> I
+                        
+                        J --> L[_resolve('speech', evt)]
+                        H --> L
+                        
+                        L --> M[performAction]
+                        M --> N{Hook Type}
+                        
+                        N -->|Gather| O[actionHook<br/>reason: speechDetected]
+                        N -->|Transcribe| P[transcriptionHook<br/>speech event]
+                        
+                        style A fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+                        style L fill:#c8e6c9,stroke:#1b5e20,stroke-width:2px
+                        style O fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+                        style P fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+                </div>
+            </div>
+
+            <h3>2. Timeout Flow</h3>
+            <div class="diagram-container">
+                <div class="mermaid">
+                    graph TD
+                        A[Start Gather/Transcribe] --> B[Start Timeout Timer]
+                        B --> C{Input Received?}
+                        
+                        C -->|No| D[Timeout Expires]
+                        C -->|Yes| E[Reset Timer]
+                        
+                        E --> C
+                        
+                        D --> F{Continuous ASR?}
+                        F -->|Yes| G[Start ASR Timer]
+                        F -->|No| H[Resolve Timeout]
+                        
+                        G --> I[Wait ASR Period]
+                        I --> J{Transcripts Buffered?}
+                        
+                        J -->|Yes| K[Consolidate & Send]
+                        J -->|No| L[Send Timeout]
+                        
+                        K --> M[reason: speechDetected]
+                        L --> N[reason: timeout]
+                        H --> N
+                        
+                        style D fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+                        style N fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+                </div>
+            </div>
+
+            <h3>3. Error Flow</h3>
+            <div class="diagram-container">
+                <div class="mermaid">
+                    graph TD
+                        A[STT Processing] --> B{Error Type?}
+                        
+                        B -->|Connection| C[ConnectFailure Event]
+                        B -->|Runtime| D[VendorError Event]
+                        B -->|Confidence| E[Low Confidence]
+                        
+                        C --> F[Generate Alert]
+                        D --> F
+                        
+                        F --> G[Write to Database]
+                        G --> H{Has Fallback?}
+                        
+                        H -->|Yes| I[Try Fallback Vendor]
+                        H -->|No| J[Send Error to Hook]
+                        
+                        E --> K[Send to Hook]
+                        K --> L[reason: stt-low-confidence]
+                        
+                        J --> M[reason: error]
+                        
+                        I --> N{Fallback Success?}
+                        N -->|Yes| O[Continue Processing]
+                        N -->|No| J
+                        
+                        style C fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+                        style D fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+                        style F fill:#fff3e0,stroke:#e65100,stroke-width:2px
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Key Implementation Differences</h2>
+            
+            <h3>1. Transcribe vs Gather Tasks</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Transcribe Task</th>
+                        <th>Gather Task</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>UtteranceEnd Handling</td>
+                        <td>Sends event if interim enabled, always consolidates buffer</td>
+                        <td>Checks last_word_end timing before consolidating</td>
+                    </tr>
+                    <tr>
+                        <td>ASR Timer for Deepgram</td>
+                        <td>Disabled - relies on UtteranceEnd</td>
+                        <td>Now enabled to handle edge cases</td>
+                    </tr>
+                    <tr>
+                        <td>Empty Final Transcripts</td>
+                        <td>Continue listening in continuous ASR mode</td>
+                        <td>Similar behavior with additional checks</td>
+                    </tr>
+                    <tr>
+                        <td>Channel Support</td>
+                        <td>Multi-channel with separate buffers</td>
+                        <td>Single channel (channel 1)</td>
+                    </tr>
+                    <tr>
+                        <td>Hook Type</td>
+                        <td>transcriptionHook</td>
+                        <td>actionHook</td>
+                    </tr>
+                    <tr>
+                        <td>Response Handling</td>
+                        <td>Can replace entire application</td>
+                        <td>Returns control to parent task</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Configuration Reference</h2>
+            
+            <h3>Transcribe Task Configuration</h3>
+            <div class="code-block">
+                <span class="code-label">Example Configuration</span>
+                <pre>{
+  "verb": "transcribe",
+  "transcriptionHook": "wss://your-webhook-url",
+  "recognizer": {
+    "vendor": "deepgram",
+    "language": "en-US",
+    "interim": true,                    // Send interim results and UtteranceEnd events
+    "asrTimeout": 2,                    // 2 seconds (will map to utteranceEndMs for Deepgram)
+    "separateRecognitionPerChannel": false,
+    "deepgramOptions": {
+      "punctuation": true,
+      "utteranceEndMs": 2000,           // Can override asrTimeout (1000-5000ms range)
+      "model": "nova-2",
+      "smart_format": true
+    }
+  }
+}</pre>
+            </div>
+
+            <h3>Key Parameters for Continuous ASR</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Description</th>
+                        <th>Default</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>recognizer.asrTimeout</code></td>
+                        <td>Timeout for continuous ASR (seconds)</td>
+                        <td>0 (disabled)</td>
+                        <td>Enables continuous ASR when > 0</td>
+                    </tr>
+                    <tr>
+                        <td><code>recognizer.interim</code></td>
+                        <td>Send interim transcripts</td>
+                        <td>false</td>
+                        <td>Also sends UtteranceEnd events when true</td>
+                    </tr>
+                    <tr>
+                        <td><code>deepgramOptions.utteranceEndMs</code></td>
+                        <td>Silence detection timeout (ms)</td>
+                        <td>asrTimeout * 1000</td>
+                        <td>Clamped to 1000-5000ms range</td>
+                    </tr>
+                    <tr>
+                        <td><code>separateRecognitionPerChannel</code></td>
+                        <td>Process channels separately</td>
+                        <td>false</td>
+                        <td>Useful for dial verb transcription</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Best Practices and Recommendations</h2>
+            
+            <div class="flow-section">
+                <h3>1. Continuous ASR with Deepgram</h3>
+                <ul class="condition-list">
+                    <li>Set <code>asrTimeout</code> between 1-5 seconds for optimal results</li>
+                    <li>Enable <code>interim</code> to receive UtteranceEnd events for real-time feedback</li>
+                    <li>Deepgram automatically handles silence detection via <code>utteranceEndMs</code></li>
+                    <li>No ASR timer is used for Deepgram in transcribe tasks - rely on UtteranceEnd</li>
+                </ul>
+            </div>
+
+            <div class="flow-section">
+                <h3>2. Handling Final Transcripts</h3>
+                <ul class="condition-list">
+                    <li>Final transcripts are buffered in continuous ASR mode</li>
+                    <li>Trailing punctuation is automatically removed to improve concatenation</li>
+                    <li>Empty final transcripts continue listening in continuous ASR mode</li>
+                    <li>Consolidated transcripts include averaged confidence scores</li>
+                </ul>
+            </div>
+
+            <div class="flow-section">
+                <h3>3. Multi-Channel Transcription</h3>
+                <ul class="condition-list">
+                    <li>Use <code>separateRecognitionPerChannel: true</code> for dial verb scenarios</li>
+                    <li>Each channel maintains its own transcript buffer</li>
+                    <li>Latency metrics are calculated per channel</li>
+                    <li>WebSocket messages indicate the channel in the payload</li>
+                </ul>
+            </div>
+
+            <div class="flow-section">
+                <h3>4. Error Handling</h3>
+                <ul class="condition-list">
+                    <li>Monitor for utteranceEndMs range errors (1000-5000ms)</li>
+                    <li>Implement proper error handling for WebSocket disconnections</li>
+                    <li>Use fallback vendors for production reliability</li>
+                    <li>Log and monitor STT_FAILURE alerts</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Summary</h2>
+            <p>The updated Deepgram transcript WebSocket implementation in Jambonz provides sophisticated handling for:</p>
+            
+            <div class="info">
+                <ul>
+                    <li><strong>Speech Final Events:</strong> Buffering and consolidation of final transcripts with special handling for continuous ASR mode</li>
+                    <li><strong>Continuous ASR:</strong> Automatic configuration of Deepgram's utteranceEndMs with enforced limits (1-5 seconds)</li>
+                    <li><strong>ASR Timeout:</strong> Vendor-specific handling where Deepgram uses UtteranceEnd events instead of timers in transcribe tasks</li>
+                    <li><strong>Multi-Channel Support:</strong> Separate recognition and buffering per channel with independent resolution</li>
+                    <li><strong>Flexible Hooks:</strong> TranscriptionHook for real-time streaming with ability to replace application flow</li>
+                </ul>
+            </div>
+            
+            <p>This architecture ensures reliable speech recognition with proper handling of Deepgram's unique features, including utterance end detection, continuous ASR modes, and real-time transcript streaming.</p>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>
