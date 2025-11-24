@@ -336,7 +336,7 @@
     "Pause": "tts_streaming::pause",
     "Resume": "tts_streaming::resume",
     "ConnectFailure": "tts_streaming::connect_failed",
-    "Connect": "tts_streaming::connect"
+    "Connected": "tts_streaming::connected"
   },
   "TtsStreamingConnectionStatus": {
     "NotConnected": "not_connected",
@@ -356,5 +356,8 @@
   "WS_CLOSE_CODES": {
     "NormalClosure": 1000,
     "GoingAway": 1001
-  }
+  },
+  "NON_FANTAL_ERRORS": [
+    "File Not Found"
+  ]
 }
